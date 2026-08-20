@@ -33,7 +33,10 @@ export async function createTask(taskData) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(taskData),
   });
-  if (!res.ok) throw new Error('Error al crear tarea');
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || `Error al crear tarea (${res.status})`);
+  }
   return res.json();
 }
 
