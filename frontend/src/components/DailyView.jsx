@@ -4,6 +4,7 @@ import confetti from 'canvas-confetti';
 import { createTask, updateTask, deleteTask } from '../api';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
 export default function DailyView({ tasks, members, activeMemberId, onTasksChanged }) {
   const currentDayIndex = new Date().getDay();
@@ -80,13 +81,14 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
       {/* Days Tabs Header */}
       <div className="glass-card" style={{ padding: '0.75rem', marginBottom: '1.5rem', overflowX: 'auto' }}>
         <div style={{ display: 'flex', gap: '0.5rem', minWidth: 'max-content' }}>
-          {DAYS.map((dayName, idx) => {
-            const isToday = idx === currentDayIndex;
-            const isSelected = idx === selectedDay;
+          {WEEK_DAYS.map((dayIndex) => {
+            const dayName = DAYS[dayIndex];
+            const isToday = dayIndex === currentDayIndex;
+            const isSelected = dayIndex === selectedDay;
             return (
               <button
                 key={dayName}
-                onClick={() => setSelectedDay(idx)}
+                onClick={() => setSelectedDay(dayIndex)}
                 style={{
                   padding: '0.6rem 1.1rem',
                   borderRadius: '12px',
@@ -100,7 +102,8 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
                   gap: '0.4rem'
                 }}
               >
-                {dayName}
+                <span className="day-label-full">{dayName}</span>
+                <span className="day-label-short">{dayName.slice(0, 3)}</span>
                 {isToday && <span style={{ fontSize: '0.65rem', background: 'var(--accent-indigo)', color: '#fff', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>Hoy</span>}
               </button>
             );

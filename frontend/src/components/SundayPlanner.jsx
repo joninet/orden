@@ -3,6 +3,7 @@ import { Calendar, Plus, Trash2, Save, Sparkles, RefreshCw, Sun, Moon } from 'lu
 import { bulkSyncTasks } from '../api';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
 
 const PRESETS = [
   { title: '🚽 Limpiar Baño', shift: 'manana' },
@@ -168,8 +169,8 @@ export default function SundayPlanner({ initialTasks, members, onPlannerSaved })
               onChange={(e) => setTargetDay(e.target.value)}
               style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(15,23,42,0.8)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
             >
-              {DAYS.map((d, i) => (
-                <option key={d} value={i}>{d}</option>
+              {WEEK_DAYS.map(dayIndex => (
+                <option key={DAYS[dayIndex]} value={dayIndex}>{DAYS[dayIndex]}</option>
               ))}
             </select>
           </div>
@@ -206,8 +207,9 @@ export default function SundayPlanner({ initialTasks, members, onPlannerSaved })
 
       {/* 7 Days Grid */}
       <div className="planner-grid">
-        {DAYS.map((dayName, dayIdx) => {
-          const dayTasks = plannerTasks.map((t, index) => ({ ...t, index })).filter(t => t.day_of_week === dayIdx);
+        {WEEK_DAYS.map(dayIndex => {
+          const dayName = DAYS[dayIndex];
+          const dayTasks = plannerTasks.map((t, index) => ({ ...t, index })).filter(t => t.day_of_week === dayIndex);
 
           return (
             <div key={dayName} className="glass-card day-card">

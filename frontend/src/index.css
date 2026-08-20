@@ -172,6 +172,10 @@ input, select, textarea {
   box-shadow: 0 4px 12px var(--accent-indigo-glow);
 }
 
+.day-label-short {
+  display: none;
+}
+
 /* User Pill Selector */
 .user-selector-bar {
   display: flex;
@@ -450,6 +454,12 @@ input, select, textarea {
   }
   .nav-tabs {
     justify-content: center;
+  }
+  .day-label-full {
+    display: none;
+  }
+  .day-label-short {
+    display: inline;
   }
   .notification-banner {
     flex-direction: column;

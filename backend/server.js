@@ -139,8 +139,8 @@ app.post('/api/notifications/test', async (req, res) => {
   const payload = JSON.stringify({
     title: '🧹 Limpieza Desplats - Prueba de Alerta',
     body: message || '¡Las notificaciones están funcionando perfectamente en tu celular! 🚀',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
+    icon: '/icon-192.svg',
+    badge: '/icon-192.svg',
     data: { url: '/' }
   });
 
@@ -170,7 +170,13 @@ app.post('/api/notifications/test', async (req, res) => {
 // ----------------- CRON JOBS FOR SCHEDULED NOTIFICATIONS -----------------
 
 async function sendScheduledShiftNotifications(shiftName, timeLabel) {
-  const todayIndex = new Date().getDay(); // 0=Domingo, 1=Lunes, ...
+  const appTimeZone = process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires';
+  const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const currentWeekday = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    timeZone: appTimeZone
+  }).format(new Date());
+  const todayIndex = weekdayNames.indexOf(currentWeekday);
   const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
   console.log(`⏰ [CRON] Ejecutando notificación programada para el turno ${shiftName} (${timeLabel}) de hoy ${dayNames[todayIndex]}`);
@@ -211,8 +217,8 @@ async function sendScheduledShiftNotifications(shiftName, timeLabel) {
     const payload = JSON.stringify({
       title: `🧹 Tareas de Limpieza - ${data.member_avatar} ${data.member_name}`,
       body: `${shiftTitle}: Tienes pendiente: ${taskListText}`,
-      icon: '/icon-192.png',
-      badge: '/icon-192.png',
+      icon: '/icon-192.svg',
+      badge: '/icon-192.svg',
       data: { url: '/' }
     });
 
@@ -240,12 +246,12 @@ async function sendScheduledShiftNotifications(shiftName, timeLabel) {
 // 09:00 AM Cron Job (Mañana)
 cron.schedule('0 9 * * *', () => {
   sendScheduledShiftNotifications('manana', '09:00 AM');
-});
+}, { timezone: process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires' });
 
 // 17:00 PM Cron Job (Tarde)
 cron.schedule('0 17 * * *', () => {
   sendScheduledShiftNotifications('tarde', '17:00 PM');
-});
+}, { timezone: process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires' });
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
