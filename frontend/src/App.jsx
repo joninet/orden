@@ -109,21 +109,21 @@ export default function App() {
             className={`nav-btn ${activeTab === 'daily' ? 'active' : ''}`}
             onClick={() => setActiveTab('daily')}
           >
-            <CheckSquare size={16} /> Hoy & Turnos
+            <CheckSquare size={16} /> Hoy
           </button>
 
           <button
             className={`nav-btn ${activeTab === 'planner' ? 'active' : ''}`}
             onClick={() => setActiveTab('planner')}
           >
-            <Calendar size={16} /> Reunión Domingo
+            <Calendar size={16} /> Domingo
           </button>
 
           <button
             className={`nav-btn ${activeTab === 'stats' ? 'active' : ''}`}
             onClick={() => setActiveTab('stats')}
           >
-            <BarChart3 size={16} /> Estadísticas
+            <BarChart3 size={16} /> Stats
           </button>
         </div>
       </div>
