@@ -35,7 +35,12 @@ const __dirname = path.dirname(__filename);
 const vapidKeysPath = path.join(__dirname, 'vapidKeys.json');
 let vapidKeys;
 
-if (fs.existsSync(vapidKeysPath)) {
+if (process.env.VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  vapidKeys = {
+    publicKey: process.env.VAPID_PUBLIC_KEY,
+    privateKey: process.env.VAPID_PRIVATE_KEY
+  };
+} else if (fs.existsSync(vapidKeysPath)) {
   vapidKeys = JSON.parse(fs.readFileSync(vapidKeysPath, 'utf8'));
 } else {
   vapidKeys = webpush.generateVAPIDKeys();
@@ -240,6 +245,13 @@ app.post('/api/notifications/test', async (req, res) => {
   res.json({ success: true, sentCount, totalSubs: subs.length });
 });
 
+function requireCronSecret(req, res, next) {
+  if (!process.env.CRON_SECRET || req.get('x-cron-secret') !== process.env.CRON_SECRET) {
+    return res.status(401).json({ error: 'No autorizado' });
+  }
+  next();
+}
+
 // ----------------- CRON JOBS FOR SCHEDULED NOTIFICATIONS -----------------
 
 async function sendScheduledShiftNotifications(shiftName, timeLabel, targetDayIndex = null) {
@@ -322,27 +334,54 @@ async function sendScheduledShiftNotifications(shiftName, timeLabel, targetDayIn
   }
 }
 
-// 09:00 AM Cron Job (Mañana)
-cron.schedule('0 9 * * *', () => {
-  sendScheduledShiftNotifications('manana', '09:00 AM');
-}, { timezone: process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires' });
-
-// 17:00 PM Cron Job (Tarde)
-cron.schedule('0 17 * * *', () => {
-  sendScheduledShiftNotifications('tarde', '17:00 PM');
-}, { timezone: process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires' });
-
-// Revisa a las 08:00 las tareas del día anterior que quedaron sin completar.
-cron.schedule('0 8 * * *', () => {
+// External schedulers can wake the sleeping web service before running a reminder.
+app.post('/api/notifications/run', requireCronSecret, async (req, res) => {
   const timezone = process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires';
   const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const currentWeekday = new Intl.DateTimeFormat('en-US', {
     weekday: 'long',
     timeZone: timezone
   }).format(new Date());
-  const previousDayIndex = (weekdayNames.indexOf(currentWeekday) + 6) % 7;
-  sendScheduledShiftNotifications(null, '08:00 AM', previousDayIndex);
-}, { timezone: process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires' });
+  const todayIndex = weekdayNames.indexOf(currentWeekday);
+  const job = req.body?.job;
+
+  if (job === 'morning') {
+    await sendScheduledShiftNotifications('manana', '09:00 AM');
+  } else if (job === 'afternoon') {
+    await sendScheduledShiftNotifications('tarde', '17:00 PM');
+  } else if (job === 'previous-day') {
+    const previousDayIndex = (todayIndex + 6) % 7;
+    await sendScheduledShiftNotifications(null, '08:00 AM', previousDayIndex);
+  } else {
+    return res.status(400).json({ error: 'El trabajo debe ser morning, afternoon o previous-day.' });
+  }
+
+  res.json({ success: true, job });
+});
+
+if (process.env.EXTERNAL_CRON_ONLY !== 'true') {
+  // 09:00 AM Cron Job (Mañana)
+  cron.schedule('0 9 * * *', () => {
+    sendScheduledShiftNotifications('manana', '09:00 AM');
+  }, { timezone: process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires' });
+
+  // 17:00 PM Cron Job (Tarde)
+  cron.schedule('0 17 * * *', () => {
+    sendScheduledShiftNotifications('tarde', '17:00 PM');
+  }, { timezone: process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires' });
+
+  // Revisa a las 08:00 las tareas del día anterior que quedaron sin completar.
+  cron.schedule('0 8 * * *', () => {
+    const timezone = process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires';
+    const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentWeekday = new Intl.DateTimeFormat('en-US', {
+      weekday: 'long',
+      timeZone: timezone
+    }).format(new Date());
+    const previousDayIndex = (weekdayNames.indexOf(currentWeekday) + 6) % 7;
+    sendScheduledShiftNotifications(null, '08:00 AM', previousDayIndex);
+  }, { timezone: process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires' });
+}
 
 const PORT = process.env.PORT || 3001;
 app.listen(PORT, () => {
