@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
 import { Sun, Moon, CheckSquare, Square, Plus, Trash2, Calendar, User, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { createTask, updateTask, deleteTask } from '../api';
+import { createTask, updateTask, deleteTask, addTaskComment } from '../api';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
+const TASK_ICONS = ['🧹', '🧽', '🧼', '🧺', '🧴', '🪣', '🧹', '🚽', '🛁', '🚿', '🍽️', '🍳', '🗑️', '♻️', '🧊', '🧯', '🧰', '🪛', '🔧', '🪟', '🛏️', '🛋️', '👕', '👚', '👟', '🧸', '🌱', '🪴', '🛒', '🐶', '🐱'];
 
 export default function DailyView({ tasks, members, activeMemberId, onTasksChanged }) {
   const currentDayIndex = new Date().getDay();
@@ -14,10 +15,12 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
 
   // New task form state
   const [newTitle, setNewTitle] = useState('');
+  const [newIcon, setNewIcon] = useState('🧹');
   const [newShift, setNewShift] = useState('manana');
   const [newMemberId, setNewMemberId] = useState(activeMemberId || members[0]?.id || 1);
 
   const activeMember = members.find(m => m.id === activeMemberId);
+  const isAdmin = activeMember?.role === 'admin';
 
   const filteredTasks = tasks.filter(t => {
     if (t.day_of_week !== selectedDay) return false;
@@ -40,7 +43,12 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
     }
 
     try {
-      await updateTask(task.id, { completed: nextState });
+      if (!isAdmin && nextState === false) {
+        const reason = prompt('¿Por qué no pudiste realizar esta tarea?');
+        if (!reason?.trim()) return;
+        await addTaskComment(task.id, reason.trim(), activeMemberId);
+      }
+      await updateTask(task.id, { completed: nextState }, activeMemberId);
       onTasksChanged();
     } catch (err) {
       alert('Error al actualizar tarea: ' + err.message);
@@ -50,10 +58,21 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
   const handleDelete = async (id) => {
     if (!confirm('¿Eliminar esta tarea?')) return;
     try {
-      await deleteTask(id);
+      await deleteTask(id, activeMemberId);
       onTasksChanged();
     } catch (err) {
       alert('Error al eliminar tarea: ' + err.message);
+    }
+  };
+
+  const handleComment = async (task) => {
+    const reason = prompt('¿Por qué no pudiste realizar esta tarea?');
+    if (!reason?.trim()) return;
+    try {
+      await addTaskComment(task.id, reason.trim(), activeMemberId);
+      alert('Motivo guardado.');
+    } catch (err) {
+      alert('Error al guardar motivo: ' + err.message);
     }
   };
 
@@ -63,11 +82,11 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
 
     try {
       await createTask({
-        title: newTitle.trim(),
+        title: `${newIcon} ${newTitle.trim()}`,
         day_of_week: selectedDay,
         shift: newShift,
         member_id: newMemberId
-      });
+      }, activeMemberId);
       setNewTitle('');
       setShowAddForm(false);
       onTasksChanged();
@@ -135,9 +154,9 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
             {filterMyTasks ? `Solo ${activeMember?.name || 'mías'}` : 'Ver de Todos'}
           </button>
 
-          <button className="btn-primary btn-sm" onClick={() => setShowAddForm(!showAddForm)}>
+          {isAdmin && <button className="btn-primary btn-sm" onClick={() => setShowAddForm(!showAddForm)}>
             <Plus size={16} /> Agregar Tarea
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -158,6 +177,14 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
                 required
                 style={{ width: '100%', padding: '0.65rem 0.85rem', background: 'rgba(15, 23, 42, 0.8)', border: '1px solid var(--border-color)', borderRadius: '10px', color: '#fff', fontSize: '0.9rem' }}
               />
+            </div>
+            <div>
+              <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>Icono</label>
+              <div className="task-icon-picker">
+                {TASK_ICONS.map(icon => (
+                  <button type="button" key={icon} className={newIcon === icon ? 'selected' : ''} onClick={() => setNewIcon(icon)}>{icon}</button>
+                ))}
+              </div>
             </div>
             <div>
               <label style={{ fontSize: '0.8rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.3rem' }}>Turno del Día</label>
@@ -216,11 +243,11 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
           ) : (
             mananaTasks.map(t => (
               <div key={t.id} className={`glass-card-interactive task-item ${t.completed ? 'completed' : ''}`}>
-                <div className={`task-checkbox ${t.completed ? 'checked' : ''}`} onClick={() => toggleTaskCompleted(t)}>
+                <div className={`task-checkbox ${t.completed ? 'checked' : ''}`} onClick={() => (isAdmin || t.member_id === activeMemberId) && toggleTaskCompleted(t)}>
                   {t.completed && <CheckSquare size={18} />}
                 </div>
 
-                <div className="task-content" onClick={() => toggleTaskCompleted(t)} style={{ cursor: 'pointer' }}>
+                <div className="task-content" onClick={() => (isAdmin || t.member_id === activeMemberId) && toggleTaskCompleted(t)} style={{ cursor: isAdmin || t.member_id === activeMemberId ? 'pointer' : 'default' }}>
                   <div className="task-title">{t.title}</div>
                   <div className="task-meta">
                     <span className="member-tag">
@@ -231,16 +258,18 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
                         ✓ Listo
                       </span>
                     )}
+                    {!isAdmin && t.member_id === activeMemberId && !t.completed && <button type="button" className="task-comment-button" onClick={() => handleComment(t)}>Motivo</button>}
+                    {t.comments?.length > 0 && <span className="task-reason">Motivo: {t.comments[t.comments.length - 1].body}</span>}
                   </div>
                 </div>
 
-                <button
+                {isAdmin && <button
                   onClick={() => handleDelete(t.id)}
                   style={{ background: 'none', color: 'var(--text-dim)', opacity: 0.6, padding: '4px' }}
                   title="Eliminar"
                 >
                   <Trash2 size={16} />
-                </button>
+                </button>}
               </div>
             ))
           )}
@@ -268,11 +297,11 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
           ) : (
             tardeTasks.map(t => (
               <div key={t.id} className={`glass-card-interactive task-item ${t.completed ? 'completed' : ''}`}>
-                <div className={`task-checkbox ${t.completed ? 'checked' : ''}`} onClick={() => toggleTaskCompleted(t)}>
+                <div className={`task-checkbox ${t.completed ? 'checked' : ''}`} onClick={() => (isAdmin || t.member_id === activeMemberId) && toggleTaskCompleted(t)}>
                   {t.completed && <CheckSquare size={18} />}
                 </div>
 
-                <div className="task-content" onClick={() => toggleTaskCompleted(t)} style={{ cursor: 'pointer' }}>
+                <div className="task-content" onClick={() => (isAdmin || t.member_id === activeMemberId) && toggleTaskCompleted(t)} style={{ cursor: isAdmin || t.member_id === activeMemberId ? 'pointer' : 'default' }}>
                   <div className="task-title">{t.title}</div>
                   <div className="task-meta">
                     <span className="member-tag">
@@ -283,16 +312,18 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
                         ✓ Listo
                       </span>
                     )}
+                    {!isAdmin && t.member_id === activeMemberId && !t.completed && <button type="button" className="task-comment-button" onClick={() => handleComment(t)}>Motivo</button>}
+                    {t.comments?.length > 0 && <span className="task-reason">Motivo: {t.comments[t.comments.length - 1].body}</span>}
                   </div>
                 </div>
 
-                <button
+                {isAdmin && <button
                   onClick={() => handleDelete(t.id)}
                   style={{ background: 'none', color: 'var(--text-dim)', opacity: 0.6, padding: '4px' }}
                   title="Eliminar"
                 >
                   <Trash2 size={16} />
-                </button>
+                </button>}
               </div>
             ))
           )}

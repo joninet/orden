@@ -1,15 +1,22 @@
 const API_BASE = '/api';
 
+function memberHeaders(memberId, includeJson = false) {
+  return {
+    ...(includeJson ? { 'Content-Type': 'application/json' } : {}),
+    ...(memberId ? { 'x-member-id': String(memberId) } : {})
+  };
+}
+
 export async function fetchMembers() {
   const res = await fetch(`${API_BASE}/members`);
   if (!res.ok) throw new Error('Error al obtener integrantes');
   return res.json();
 }
 
-export async function updateMember(id, data) {
+export async function updateMember(id, data, actorId) {
   const res = await fetch(`${API_BASE}/members/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: memberHeaders(actorId, true),
     body: JSON.stringify(data),
   });
   if (!res.ok) throw new Error('Error al actualizar integrante');
@@ -27,10 +34,10 @@ export async function fetchTasks(filters = {}) {
   return res.json();
 }
 
-export async function createTask(taskData) {
+export async function createTask(taskData, actorId) {
   const res = await fetch(`${API_BASE}/tasks`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: memberHeaders(actorId, true),
     body: JSON.stringify(taskData),
   });
   if (!res.ok) {
@@ -40,31 +47,45 @@ export async function createTask(taskData) {
   return res.json();
 }
 
-export async function updateTask(id, taskData) {
+export async function updateTask(id, taskData, actorId) {
   const res = await fetch(`${API_BASE}/tasks/${id}`, {
     method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
+    headers: memberHeaders(actorId, true),
     body: JSON.stringify(taskData),
   });
   if (!res.ok) throw new Error('Error al actualizar tarea');
   return res.json();
 }
 
-export async function deleteTask(id) {
+export async function deleteTask(id, actorId) {
   const res = await fetch(`${API_BASE}/tasks/${id}`, {
     method: 'DELETE',
+    headers: memberHeaders(actorId),
   });
   if (!res.ok) throw new Error('Error al eliminar tarea');
   return res.json();
 }
 
-export async function bulkSyncTasks(tasks) {
+export async function bulkSyncTasks(tasks, actorId) {
   const res = await fetch(`${API_BASE}/tasks/bulk-sync`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: memberHeaders(actorId, true),
     body: JSON.stringify({ tasks }),
   });
   if (!res.ok) throw new Error('Error al sincronizar tareas');
+  return res.json();
+}
+
+export async function addTaskComment(taskId, body, actorId) {
+  const res = await fetch(`${API_BASE}/tasks/${taskId}/comments`, {
+    method: 'POST',
+    headers: memberHeaders(actorId, true),
+    body: JSON.stringify({ body })
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Error al guardar comentario');
+  }
   return res.json();
 }
 

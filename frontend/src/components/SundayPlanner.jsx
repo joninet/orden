@@ -1,24 +1,12 @@
 import React, { useState } from 'react';
-import { Calendar, Plus, Trash2, Save, Sparkles, RefreshCw, Sun, Moon } from 'lucide-react';
+import { Calendar, Plus, Trash2, Save, RefreshCw, Sun, Moon } from 'lucide-react';
 import { bulkSyncTasks } from '../api';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
+const TASK_ICONS = ['🧹', '🧽', '🧼', '🧺', '🧴', '🪣', '🚽', '🛁', '🚿', '🍽️', '🍳', '🗑️', '♻️', '🧊', '🧯', '🧰', '🪛', '🔧', '🪟', '🛏️', '🛋️', '👕', '👚', '👟', '🧸', '🌱', '🪴', '🛒'];
 
-const PRESETS = [
-  { title: '🚽 Limpiar Baño', shift: 'manana' },
-  { title: '🍳 Limpiar Cocina', shift: 'tarde' },
-  { title: '🗑️ Sacar Basura', shift: 'tarde' },
-  { title: '🍽️ Lavar Platos', shift: 'manana' },
-  { title: '🧹 Pasar Aspiradora / Trapo', shift: 'manana' },
-  { title: '🛋️ Ordenar Livings', shift: 'tarde' },
-  { title: '🧺 Lavar Ropa', shift: 'manana' },
-  { title: '🪟 Limpiar Vidrios', shift: 'tarde' },
-  { title: '🛒 Hacer Compras', shift: 'manana' },
-  { title: '🪴 Regar Plantas', shift: 'tarde' }
-];
-
-export default function SundayPlanner({ initialTasks, members, onPlannerSaved }) {
+export default function SundayPlanner({ initialTasks, members, activeMemberId, onPlannerSaved }) {
   const [plannerTasks, setPlannerTasks] = useState(
     initialTasks.map(t => ({
       id: t.id,
@@ -32,23 +20,10 @@ export default function SundayPlanner({ initialTasks, members, onPlannerSaved })
 
   const [saving, setSaving] = useState(false);
   const [customTitle, setCustomTitle] = useState('');
+  const [customIcon, setCustomIcon] = useState('🧹');
   const [targetDay, setTargetDay] = useState(1); // Lunes default
   const [targetShift, setTargetShift] = useState('manana');
   const [targetMember, setTargetMember] = useState(members[0]?.id || 1);
-
-  const addPresetToDay = (preset, dayIndex) => {
-    const defaultMemberId = members[(plannerTasks.length) % members.length]?.id || members[0]?.id;
-    setPlannerTasks(prev => [
-      ...prev,
-      {
-        title: preset.title,
-        day_of_week: dayIndex,
-        shift: preset.shift,
-        member_id: defaultMemberId,
-        completed: 0
-      }
-    ]);
-  };
 
   const addCustomTask = (e) => {
     e.preventDefault();
@@ -56,7 +31,7 @@ export default function SundayPlanner({ initialTasks, members, onPlannerSaved })
     setPlannerTasks(prev => [
       ...prev,
       {
-        title: customTitle.trim(),
+        title: `${customIcon} ${customTitle.trim()}`,
         day_of_week: parseInt(targetDay),
         shift: targetShift,
         member_id: parseInt(targetMember),
@@ -89,7 +64,7 @@ export default function SundayPlanner({ initialTasks, members, onPlannerSaved })
   const handleSavePlanner = async () => {
     setSaving(true);
     try {
-      await bulkSyncTasks(plannerTasks);
+      await bulkSyncTasks(plannerTasks, activeMemberId);
       alert('🎉 ¡Organización semanal guardada exitosamente! Todos recibirán sus alertas automáticas.');
       onPlannerSaved();
     } catch (err) {
@@ -128,25 +103,6 @@ export default function SundayPlanner({ initialTasks, members, onPlannerSaved })
         </div>
       </div>
 
-      {/* Preset Tasks Quick Buttons */}
-      <div className="glass-card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
-        <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem', display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
-          <Sparkles size={16} color="#f59e0b" /> Tareas Rápidas Recomendadas (Haz clic para agregar al Lunes)
-        </h3>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          {PRESETS.map((preset, idx) => (
-            <button
-              key={idx}
-              className="btn-secondary btn-sm"
-              onClick={() => addPresetToDay(preset, 1)}
-              style={{ fontSize: '0.82rem', padding: '0.4rem 0.8rem' }}
-            >
-              <Plus size={12} /> {preset.title}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Add Custom Task Box */}
       <form onSubmit={addCustomTask} className="glass-card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
         <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem' }}>➕ Agregar Tarea Personalizada</h3>
@@ -161,6 +117,14 @@ export default function SundayPlanner({ initialTasks, members, onPlannerSaved })
               required
               style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(15,23,42,0.8)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
             />
+          </div>
+          <div>
+            <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Icono</label>
+            <div className="task-icon-picker">
+              {TASK_ICONS.map(icon => (
+                <button type="button" key={icon} className={customIcon === icon ? 'selected' : ''} onClick={() => setCustomIcon(icon)}>{icon}</button>
+              ))}
+            </div>
           </div>
           <div>
             <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Día</label>

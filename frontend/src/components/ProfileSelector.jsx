@@ -24,7 +24,7 @@ export default function ProfileSelector({ members, activeMemberId, onSelectMembe
   const saveEdit = async (m, e) => {
     e.stopPropagation();
     try {
-      const updated = await updateMember(m.id, { name: editName, avatar: editAvatar, role: m.role });
+      const updated = await updateMember(m.id, { name: editName, avatar: editAvatar, role: m.role }, activeMemberId);
       onMemberUpdated(updated);
       setEditingId(null);
     } catch (err) {
@@ -105,13 +105,15 @@ export default function ProfileSelector({ members, activeMemberId, onSelectMembe
             >
               <span className="user-avatar">{m.avatar}</span>
               <span>{m.name}</span>
-              <button
-                onClick={(e) => startEdit(m, e)}
-                style={{ background: 'none', color: 'var(--text-dim)', padding: '2px', marginLeft: '4px' }}
-                title="Editar nombre/emoji"
-              >
-                <Edit2 size={12} />
-              </button>
+              {members.find(member => member.id === activeMemberId)?.role === 'admin' && (
+                <button
+                  onClick={(e) => startEdit(m, e)}
+                  style={{ background: 'none', color: 'var(--text-dim)', padding: '2px', marginLeft: '4px' }}
+                  title="Editar nombre/emoji"
+                >
+                  <Edit2 size={12} />
+                </button>
+              )}
             </div>
           );
         })}

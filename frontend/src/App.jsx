@@ -58,6 +58,8 @@ export default function App() {
   const handleSelectMember = (id) => {
     setActiveMemberId(id);
     localStorage.setItem(USER_STORAGE_KEY, id);
+    const selectedMember = members.find(member => member.id === id);
+    if (selectedMember?.role !== 'admin') setActiveTab('daily');
     setShowOnboarding(false);
   };
 
@@ -74,6 +76,9 @@ export default function App() {
     setMembers(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m));
     reloadTasks();
   };
+
+  const activeMember = members.find(member => member.id === activeMemberId);
+  const isAdmin = activeMember?.role === 'admin';
 
   if (loading) {
     return (
@@ -112,12 +117,12 @@ export default function App() {
             <CheckSquare size={16} /> Hoy
           </button>
 
-          <button
+          {isAdmin && <button
             className={`nav-btn ${activeTab === 'planner' ? 'active' : ''}`}
             onClick={() => setActiveTab('planner')}
           >
             <Calendar size={16} /> Domingo
-          </button>
+          </button>}
 
           <button
             className={`nav-btn ${activeTab === 'stats' ? 'active' : ''}`}
@@ -154,10 +159,11 @@ export default function App() {
         />
       )}
 
-      {activeTab === 'planner' && (
+      {activeTab === 'planner' && isAdmin && (
         <SundayPlanner
           initialTasks={tasks}
           members={members}
+          activeMemberId={activeMemberId}
           onPlannerSaved={() => {
             reloadTasks();
             setActiveTab('daily');

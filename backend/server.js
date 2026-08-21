@@ -8,6 +8,7 @@ import cron from 'node-cron';
 import {
   initDatabase,
   getMembers,
+  getMember,
   updateMember,
   getTasks,
   createTask,
@@ -16,7 +17,9 @@ import {
   bulkSyncTasks,
   savePushSubscription,
   getPushSubscriptions,
-  deletePushSubscription
+  deletePushSubscription,
+  getTaskComments,
+  addTaskComment
 } from './database.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,6 +50,21 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+function getRequestMember(req) {
+  return getMember(req.get('x-member-id'));
+}
+
+function isAdmin(member) {
+  return member?.role === 'admin';
+}
+
+function requireAdmin(req, res, next) {
+  if (!isAdmin(getRequestMember(req))) {
+    return res.status(403).json({ error: 'Solo Joni y Fher pueden modificar la organización.' });
+  }
+  next();
+}
+
 // Serve static frontend files if built
 const frontendDistPath = path.join(__dirname, '../frontend/dist');
 if (fs.existsSync(frontendDistPath)) {
@@ -66,6 +84,9 @@ app.get('/api/members', (req, res) => {
 });
 
 app.put('/api/members/:id', (req, res) => {
+  if (!isAdmin(getRequestMember(req))) {
+    return res.status(403).json({ error: 'Solo Joni y Fher pueden editar integrantes.' });
+  }
   const { id } = req.params;
   const { name, avatar, role } = req.body;
   const updated = updateMember(id, { name, avatar, role });
@@ -81,6 +102,9 @@ app.get('/api/tasks', (req, res) => {
 });
 
 app.post('/api/tasks', (req, res) => {
+  if (!isAdmin(getRequestMember(req))) {
+    return res.status(403).json({ error: 'Solo Joni y Fher pueden agregar tareas.' });
+  }
   const { title, description, day_of_week, shift, member_id } = req.body;
   if (!title || day_of_week === undefined || !shift) {
     return res.status(400).json({ error: 'Título, día de la semana y turno son requeridos' });
@@ -90,7 +114,17 @@ app.post('/api/tasks', (req, res) => {
 });
 
 app.put('/api/tasks/:id', (req, res) => {
+  const member = getRequestMember(req);
   const { id } = req.params;
+  const task = getTasks().find(item => item.id === parseInt(id));
+  if (!task) return res.status(404).json({ error: 'Tarea no encontrada' });
+
+  if (!isAdmin(member)) {
+    if (task.member_id !== member?.id || Object.keys(req.body).some(key => key !== 'completed')) {
+      return res.status(403).json({ error: 'Solo puedes marcar tus propias tareas como realizadas.' });
+    }
+  }
+
   const updatedTask = updateTask(id, req.body);
   if (!updatedTask) {
     return res.status(404).json({ error: 'Tarea no encontrada' });
@@ -99,6 +133,9 @@ app.put('/api/tasks/:id', (req, res) => {
 });
 
 app.delete('/api/tasks/:id', (req, res) => {
+  if (!isAdmin(getRequestMember(req))) {
+    return res.status(403).json({ error: 'Solo Joni y Fher pueden eliminar tareas.' });
+  }
   const { id } = req.params;
   const success = deleteTask(id);
   if (!success) return res.status(404).json({ error: 'Tarea no encontrada' });
@@ -106,13 +143,29 @@ app.delete('/api/tasks/:id', (req, res) => {
 });
 
 // Bulk update tasks for Sunday planning
-app.post('/api/tasks/bulk-sync', (req, res) => {
+app.post('/api/tasks/bulk-sync', requireAdmin, (req, res) => {
   const { tasks } = req.body;
   if (!Array.isArray(tasks)) {
     return res.status(400).json({ error: 'Se requiere un arreglo de tareas' });
   }
   const allTasks = bulkSyncTasks(tasks);
   res.json(allTasks);
+});
+
+app.get('/api/tasks/:id/comments', (req, res) => {
+  res.json(getTaskComments(req.params.id));
+});
+
+app.post('/api/tasks/:id/comments', (req, res) => {
+  const member = getRequestMember(req);
+  const body = typeof req.body.body === 'string' ? req.body.body.trim() : '';
+  const task = getTasks().find(item => item.id === parseInt(req.params.id));
+  if (!member || !task) return res.status(404).json({ error: 'Tarea o integrante no encontrado' });
+  if (!isAdmin(member) && task.member_id !== member.id) {
+    return res.status(403).json({ error: 'Solo puedes comentar tus propias tareas.' });
+  }
+  if (!body) return res.status(400).json({ error: 'El comentario no puede estar vacío.' });
+  res.status(201).json(addTaskComment(req.params.id, member.id, body));
 });
 
 // Save Push Subscription
@@ -169,7 +222,7 @@ app.post('/api/notifications/test', async (req, res) => {
 
 // ----------------- CRON JOBS FOR SCHEDULED NOTIFICATIONS -----------------
 
-async function sendScheduledShiftNotifications(shiftName, timeLabel) {
+async function sendScheduledShiftNotifications(shiftName, timeLabel, targetDayIndex = null) {
   const appTimeZone = process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires';
   const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const currentWeekday = new Intl.DateTimeFormat('en-US', {
@@ -179,10 +232,14 @@ async function sendScheduledShiftNotifications(shiftName, timeLabel) {
   const todayIndex = weekdayNames.indexOf(currentWeekday);
   const dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 
-  console.log(`⏰ [CRON] Ejecutando notificación programada para el turno ${shiftName} (${timeLabel}) de hoy ${dayNames[todayIndex]}`);
+  const notificationDayIndex = targetDayIndex ?? todayIndex;
+  const notificationType = shiftName ? `turno ${shiftName}` : 'tareas pendientes';
+  console.log(`⏰ [CRON] Ejecutando notificación de ${notificationType} (${timeLabel}) para ${dayNames[notificationDayIndex]}`);
 
-  // Fetch pending tasks for today and this shift
-  const tasks = getTasks({ day_of_week: todayIndex, shift: shiftName }).filter(t => t.completed === 0);
+  const tasks = getTasks({
+    day_of_week: notificationDayIndex,
+    ...(shiftName ? { shift: shiftName } : {})
+  }).filter(t => t.completed === 0);
 
   if (tasks.length === 0) {
     console.log(`ℹ️ No hay tareas pendientes para el turno ${shiftName} de hoy.`);
@@ -212,7 +269,9 @@ async function sendScheduledShiftNotifications(shiftName, timeLabel) {
     if (targetSubs.length === 0) continue;
 
     const taskListText = data.tasks.join(', ');
-    const shiftTitle = shiftName === 'manana' ? '☀️ Turno Mañana (09:00 hs)' : '🌙 Turno Tarde (17:00 hs)';
+    const shiftTitle = !shiftName
+      ? '⚠️ Tarea pendiente del día anterior'
+      : shiftName === 'manana' ? '☀️ Turno Mañana (09:00 hs)' : '🌙 Turno Tarde (17:00 hs)';
     
     const payload = JSON.stringify({
       title: `🧹 Tareas de Limpieza - ${data.member_avatar} ${data.member_name}`,
@@ -251,6 +310,18 @@ cron.schedule('0 9 * * *', () => {
 // 17:00 PM Cron Job (Tarde)
 cron.schedule('0 17 * * *', () => {
   sendScheduledShiftNotifications('tarde', '17:00 PM');
+}, { timezone: process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires' });
+
+// Revisa a las 08:00 las tareas del día anterior que quedaron sin completar.
+cron.schedule('0 8 * * *', () => {
+  const timezone = process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires';
+  const weekdayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+  const currentWeekday = new Intl.DateTimeFormat('en-US', {
+    weekday: 'long',
+    timeZone: timezone
+  }).format(new Date());
+  const previousDayIndex = (weekdayNames.indexOf(currentWeekday) + 6) % 7;
+  sendScheduledShiftNotifications(null, '08:00 AM', previousDayIndex);
 }, { timezone: process.env.APP_TIMEZONE || 'America/Argentina/Buenos_Aires' });
 
 const PORT = process.env.PORT || 3001;

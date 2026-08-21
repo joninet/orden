@@ -10,9 +10,11 @@ let dbData = {
   members: [],
   tasks: [],
   push_subscriptions: [],
+  comments: [],
   nextMemberId: 1,
   nextTaskId: 1,
-  nextSubId: 1
+  nextSubId: 1,
+  nextCommentId: 1
 };
 
 function saveToFile() {
@@ -62,13 +64,19 @@ export function initDatabase() {
 
   if (!dbData.tasks) dbData.tasks = [];
   if (!dbData.push_subscriptions) dbData.push_subscriptions = [];
+  if (!dbData.comments) dbData.comments = [];
   if (!dbData.nextTaskId) dbData.nextTaskId = dbData.tasks.length + 1;
   if (!dbData.nextSubId) dbData.nextSubId = dbData.push_subscriptions.length + 1;
+  if (!dbData.nextCommentId) dbData.nextCommentId = dbData.comments.length + 1;
 }
 
 // Members Operations
 export function getMembers() {
   return dbData.members;
+}
+
+export function getMember(id) {
+  return dbData.members.find(member => member.id === parseInt(id));
 }
 
 export function updateMember(id, { name, avatar, role }) {
@@ -88,7 +96,8 @@ export function getTasks(filters = {}) {
     return {
       ...t,
       member_name: member ? member.name : 'Sin Asignar',
-      member_avatar: member ? member.avatar : '🧹'
+      member_avatar: member ? member.avatar : '🧹',
+      comments: getTaskComments(t.id)
     };
   });
 
@@ -168,6 +177,32 @@ export function deleteTask(id) {
     return true;
   }
   return false;
+}
+
+export function getTaskComments(taskId) {
+  return dbData.comments
+    .filter(comment => comment.task_id === parseInt(taskId))
+    .map(comment => ({
+      ...comment,
+      member_name: getMember(comment.member_id)?.name || 'Integrante'
+    }))
+    .sort((a, b) => new Date(a.created_at) - new Date(b.created_at));
+}
+
+export function addTaskComment(taskId, memberId, body) {
+  const comment = {
+    id: dbData.nextCommentId++,
+    task_id: parseInt(taskId),
+    member_id: parseInt(memberId),
+    body: body.trim(),
+    created_at: new Date().toISOString()
+  };
+  dbData.comments.push(comment);
+  saveToFile();
+  return {
+    ...comment,
+    member_name: getMember(memberId)?.name || 'Integrante'
+  };
 }
 
 export function bulkSyncTasks(newTaskList) {
