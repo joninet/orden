@@ -79,8 +79,8 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
   return (
     <div className="animate-fade-in">
       {/* Days Tabs Header */}
-      <div className="glass-card" style={{ padding: '0.75rem', marginBottom: '1.5rem', overflowX: 'auto' }}>
-        <div style={{ display: 'flex', gap: '0.5rem', minWidth: 'max-content' }}>
+      <div className="glass-card day-tabs-container" style={{ padding: '0.75rem', marginBottom: '1.5rem' }}>
+        <div className="day-tabs">
           {WEEK_DAYS.map((dayIndex) => {
             const dayName = DAYS[dayIndex];
             const isToday = dayIndex === currentDayIndex;
@@ -104,7 +104,7 @@ export default function DailyView({ tasks, members, activeMemberId, onTasksChang
               >
                 <span className="day-label-full">{dayName}</span>
                 <span className="day-label-short">{dayName.slice(0, 3)}</span>
-                {isToday && <span style={{ fontSize: '0.65rem', background: 'var(--accent-indigo)', color: '#fff', padding: '0.1rem 0.4rem', borderRadius: '10px' }}>Hoy</span>}
+                {isToday && <span className="today-badge">Hoy</span>}
               </button>
             );
           })}
