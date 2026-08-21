@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, Calendar, CheckSquare, BarChart3, RefreshCw } from 'lucide-react';
-import { fetchMembers, fetchTasks } from './api';
+import { fetchMembers, fetchTasks, fetchTaskTemplates } from './api';
 import ProfileSelector from './components/ProfileSelector';
 import NotificationSetup from './components/NotificationSetup';
 import DailyView from './components/DailyView';
@@ -16,6 +16,7 @@ export default function App() {
   const [activeMemberId, setActiveMemberId] = useState(null);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [tasks, setTasks] = useState([]);
+  const [taskTemplates, setTaskTemplates] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,9 +33,10 @@ export default function App() {
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [membersData, tasksData] = await Promise.all([
+      const [membersData, tasksData, templatesData] = await Promise.all([
         fetchMembers(),
-        fetchTasks()
+        fetchTasks(),
+        fetchTaskTemplates()
       ]);
       setMembers(membersData);
 
@@ -48,6 +50,7 @@ export default function App() {
       }
 
       setTasks(tasksData);
+      setTaskTemplates(templatesData);
     } catch (err) {
       console.error('Error cargando datos iniciales:', err);
     } finally {
@@ -69,6 +72,14 @@ export default function App() {
       setTasks(tasksData);
     } catch (err) {
       console.error('Error recargando tareas:', err);
+    }
+  };
+
+  const reloadTaskTemplates = async () => {
+    try {
+      setTaskTemplates(await fetchTaskTemplates());
+    } catch (err) {
+      console.error('Error recargando tareas reutilizables:', err);
     }
   };
 
@@ -95,6 +106,7 @@ export default function App() {
       {showOnboarding && (
         <OnboardingModal
           members={members}
+          taskTemplates={taskTemplates}
           onSelectMember={handleSelectMember}
         />
       )}
@@ -154,6 +166,7 @@ export default function App() {
         <DailyView
           tasks={tasks}
           members={members}
+          taskTemplates={taskTemplates}
           activeMemberId={activeMemberId}
           onTasksChanged={reloadTasks}
         />
@@ -163,7 +176,9 @@ export default function App() {
         <SundayPlanner
           initialTasks={tasks}
           members={members}
+          taskTemplates={taskTemplates}
           activeMemberId={activeMemberId}
+          onTaskTemplatesChanged={reloadTaskTemplates}
           onPlannerSaved={() => {
             reloadTasks();
             setActiveTab('daily');

@@ -34,6 +34,34 @@ export async function fetchTasks(filters = {}) {
   return res.json();
 }
 
+export async function fetchTaskTemplates() {
+  const res = await fetch(`${API_BASE}/task-templates`);
+  if (!res.ok) throw new Error('Error al obtener tareas reutilizables');
+  return res.json();
+}
+
+export async function createTaskTemplate(data, actorId) {
+  const res = await fetch(`${API_BASE}/task-templates`, {
+    method: 'POST',
+    headers: memberHeaders(actorId, true),
+    body: JSON.stringify(data)
+  });
+  if (!res.ok) {
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(errorData.error || 'Error al guardar tarea reutilizable');
+  }
+  return res.json();
+}
+
+export async function deleteTaskTemplate(id, actorId) {
+  const res = await fetch(`${API_BASE}/task-templates/${id}`, {
+    method: 'DELETE',
+    headers: memberHeaders(actorId)
+  });
+  if (!res.ok) throw new Error('Error al eliminar tarea reutilizable');
+  return res.json();
+}
+
 export async function createTask(taskData, actorId) {
   const res = await fetch(`${API_BASE}/tasks`, {
     method: 'POST',

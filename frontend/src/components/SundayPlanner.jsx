@@ -1,12 +1,12 @@
 import React, { useState } from 'react';
 import { Calendar, Plus, Trash2, Save, RefreshCw, Sun, Moon } from 'lucide-react';
-import { bulkSyncTasks } from '../api';
+import { bulkSyncTasks, createTaskTemplate, deleteTaskTemplate } from '../api';
 
 const DAYS = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
 const WEEK_DAYS = [1, 2, 3, 4, 5, 6, 0];
 const TASK_ICONS = ['🧹', '🧽', '🧼', '🧺', '🧴', '🪣', '🚽', '🛁', '🚿', '🍽️', '🍳', '🗑️', '♻️', '🧊', '🧯', '🧰', '🪛', '🔧', '🪟', '🛏️', '🛋️', '👕', '👚', '👟', '🧸', '🌱', '🪴', '🛒'];
 
-export default function SundayPlanner({ initialTasks, members, activeMemberId, onPlannerSaved }) {
+export default function SundayPlanner({ initialTasks, members, taskTemplates, activeMemberId, onTaskTemplatesChanged, onPlannerSaved }) {
   const [plannerTasks, setPlannerTasks] = useState(
     initialTasks.map(t => ({
       id: t.id,
@@ -21,17 +21,23 @@ export default function SundayPlanner({ initialTasks, members, activeMemberId, o
   const [saving, setSaving] = useState(false);
   const [customTitle, setCustomTitle] = useState('');
   const [customIcon, setCustomIcon] = useState('🧹');
+  const [selectedTemplateId, setSelectedTemplateId] = useState('');
+  const [templateTitle, setTemplateTitle] = useState('');
+  const [templateIcon, setTemplateIcon] = useState('🧹');
   const [targetDay, setTargetDay] = useState(1); // Lunes default
   const [targetShift, setTargetShift] = useState('manana');
   const [targetMember, setTargetMember] = useState(members[0]?.id || 1);
 
   const addCustomTask = (e) => {
     e.preventDefault();
-    if (!customTitle.trim()) return;
+    const template = taskTemplates.find(item => item.id === parseInt(selectedTemplateId));
+    const title = template?.title || customTitle.trim();
+    const icon = template?.icon || customIcon;
+    if (!title) return;
     setPlannerTasks(prev => [
       ...prev,
       {
-        title: `${customIcon} ${customTitle.trim()}`,
+        title: `${icon} ${title}`,
         day_of_week: parseInt(targetDay),
         shift: targetShift,
         member_id: parseInt(targetMember),
@@ -39,6 +45,30 @@ export default function SundayPlanner({ initialTasks, members, activeMemberId, o
       }
     ]);
     setCustomTitle('');
+    setSelectedTemplateId('');
+  };
+
+  const handleCreateTemplate = async (e) => {
+    e.preventDefault();
+    if (!templateTitle.trim()) return;
+    try {
+      await createTaskTemplate({ title: templateTitle.trim(), icon: templateIcon }, activeMemberId);
+      setTemplateTitle('');
+      await onTaskTemplatesChanged();
+      alert('Tarea guardada en la biblioteca.');
+    } catch (err) {
+      alert('Error al guardar tarea reutilizable: ' + err.message);
+    }
+  };
+
+  const handleDeleteTemplate = async (id) => {
+    if (!confirm('¿Eliminar esta tarea de la biblioteca?')) return;
+    try {
+      await deleteTaskTemplate(id, activeMemberId);
+      onTaskTemplatesChanged();
+    } catch (err) {
+      alert('Error al eliminar tarea reutilizable: ' + err.message);
+    }
   };
 
   const removePlannerTask = (index) => {
@@ -103,17 +133,57 @@ export default function SundayPlanner({ initialTasks, members, activeMemberId, o
         </div>
       </div>
 
+      <div className="glass-card template-library" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
+        <div>
+          <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.35rem' }}>Biblioteca de tareas</h3>
+          <p style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.8rem' }}>
+            Crealas una vez y reutilizalas cuando armes la semana.
+          </p>
+        </div>
+        <form onSubmit={handleCreateTemplate} className="template-create-form">
+          <input
+            type="text"
+            placeholder="Ej. Tender ropa"
+            value={templateTitle}
+            onChange={(e) => setTemplateTitle(e.target.value)}
+            required
+            style={{ flex: 1, minWidth: '180px', padding: '0.55rem 0.7rem', background: 'rgba(15,23,42,0.8)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff' }}
+          />
+          <select value={templateIcon} onChange={(e) => setTemplateIcon(e.target.value)} className="template-icon-select">
+            {TASK_ICONS.map(icon => <option key={icon} value={icon}>{icon}</option>)}
+          </select>
+          <button type="submit" className="btn-primary btn-sm"><Plus size={14} /> Guardar tarea</button>
+        </form>
+        <div className="template-list">
+          {taskTemplates.length === 0 ? <span className="template-empty">Todavía no hay tareas guardadas.</span> : taskTemplates.map(template => (
+            <div key={template.id} className="template-chip">
+              <span>{template.icon} {template.title}</span>
+              <button type="button" onClick={() => handleDeleteTemplate(template.id)} title="Eliminar de la biblioteca"><Trash2 size={13} /></button>
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Add Custom Task Box */}
       <form onSubmit={addCustomTask} className="glass-card" style={{ padding: '1.25rem', marginBottom: '1.5rem' }}>
         <h3 style={{ fontSize: '0.95rem', fontWeight: 700, marginBottom: '0.75rem' }}>➕ Agregar Tarea Personalizada</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '0.75rem', alignItems: 'end' }}>
           <div>
             <label style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginBottom: '0.2rem' }}>Nombre de Tarea</label>
+            <select
+              value={selectedTemplateId}
+              onChange={(e) => setSelectedTemplateId(e.target.value)}
+              style={{ width: '100%', marginBottom: '0.4rem', padding: '0.5rem 0.75rem', background: 'rgba(15,23,42,0.8)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
+            >
+              <option value="">Elegir de la biblioteca...</option>
+              {taskTemplates.map(template => <option key={template.id} value={template.id}>{template.icon} {template.title}</option>)}
+            </select>
             <input
               type="text"
               placeholder="ej. Ordenar alacena"
               value={customTitle}
               onChange={(e) => setCustomTitle(e.target.value)}
+              disabled={Boolean(selectedTemplateId)}
               required
               style={{ width: '100%', padding: '0.5rem 0.75rem', background: 'rgba(15,23,42,0.8)', border: '1px solid var(--border-color)', borderRadius: '8px', color: '#fff', fontSize: '0.85rem' }}
             />

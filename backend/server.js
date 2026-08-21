@@ -11,6 +11,9 @@ import {
   getMember,
   updateMember,
   getTasks,
+  getTaskTemplates,
+  createTaskTemplate,
+  deleteTaskTemplate,
   createTask,
   updateTask,
   deleteTask,
@@ -99,6 +102,23 @@ app.get('/api/tasks', (req, res) => {
   const { day_of_week, shift, member_id } = req.query;
   const tasks = getTasks({ day_of_week, shift, member_id });
   res.json(tasks);
+});
+
+app.get('/api/task-templates', (req, res) => {
+  res.json(getTaskTemplates());
+});
+
+app.post('/api/task-templates', requireAdmin, (req, res) => {
+  const { title, icon } = req.body;
+  if (!title?.trim()) return res.status(400).json({ error: 'El nombre de la tarea es requerido.' });
+  res.status(201).json(createTaskTemplate({ title, icon }));
+});
+
+app.delete('/api/task-templates/:id', requireAdmin, (req, res) => {
+  if (!deleteTaskTemplate(req.params.id)) {
+    return res.status(404).json({ error: 'Tarea reutilizable no encontrada.' });
+  }
+  res.json({ success: true });
 });
 
 app.post('/api/tasks', (req, res) => {

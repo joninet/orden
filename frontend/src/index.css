@@ -220,6 +220,54 @@ input, select, textarea {
   font-weight: 600;
 }
 
+.template-create-form {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.template-icon-select {
+  width: 52px;
+  padding: 0.55rem 0.25rem;
+  background: rgba(15, 23, 42, 0.8);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 1.1rem;
+}
+
+.template-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  margin-top: 0.9rem;
+}
+
+.template-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  padding: 0.4rem 0.55rem 0.4rem 0.7rem;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-main);
+  font-size: 0.82rem;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.template-chip button {
+  display: inline-flex;
+  padding: 0.15rem;
+  color: var(--text-dim);
+  background: transparent;
+}
+
+.template-empty {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
 .task-reason {
   flex-basis: 100%;
   color: var(--text-muted);

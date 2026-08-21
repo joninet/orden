@@ -9,6 +9,7 @@ const dbFilePath = path.join(__dirname, 'db.json');
 let dbData = {
   members: [],
   tasks: [],
+  task_templates: [],
   push_subscriptions: [],
   comments: [],
   nextMemberId: 1,
@@ -63,6 +64,7 @@ export function initDatabase() {
   }
 
   if (!dbData.tasks) dbData.tasks = [];
+  if (!dbData.task_templates) dbData.task_templates = [];
   if (!dbData.push_subscriptions) dbData.push_subscriptions = [];
   if (!dbData.comments) dbData.comments = [];
   if (!dbData.nextTaskId) dbData.nextTaskId = dbData.tasks.length + 1;
@@ -136,6 +138,38 @@ export function createTask({ title, description, day_of_week, shift, member_id }
     member_name: member ? member.name : 'Sin Asignar',
     member_avatar: member ? member.avatar : '🧹'
   };
+}
+
+export function getTaskTemplates() {
+  return [...dbData.task_templates].sort((a, b) => a.title.localeCompare(b.title));
+}
+
+export function createTaskTemplate({ title, icon }) {
+  const normalizedTitle = title.trim();
+  const existing = dbData.task_templates.find(template =>
+    template.title.toLowerCase() === normalizedTitle.toLowerCase()
+  );
+  if (existing) return existing;
+
+  const template = {
+    id: dbData.task_templates.length
+      ? Math.max(...dbData.task_templates.map(item => item.id)) + 1
+      : 1,
+    title: normalizedTitle,
+    icon: icon || '🧹',
+    created_at: new Date().toISOString()
+  };
+  dbData.task_templates.push(template);
+  saveToFile();
+  return template;
+}
+
+export function deleteTaskTemplate(id) {
+  const initialLength = dbData.task_templates.length;
+  dbData.task_templates = dbData.task_templates.filter(template => template.id !== parseInt(id));
+  if (dbData.task_templates.length === initialLength) return false;
+  saveToFile();
+  return true;
 }
 
 export function updateTask(id, data) {
