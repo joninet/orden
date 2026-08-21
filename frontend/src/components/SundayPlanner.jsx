@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Calendar, Plus, Trash2, Save, RefreshCw, Sun, Moon } from 'lucide-react';
 import { bulkSyncTasks, createTaskTemplate, deleteTaskTemplate } from '../api';
 
@@ -27,6 +27,17 @@ export default function SundayPlanner({ initialTasks, members, taskTemplates, ac
   const [targetDay, setTargetDay] = useState(1); // Lunes default
   const [targetShift, setTargetShift] = useState('manana');
   const [targetMember, setTargetMember] = useState(members[0]?.id || 1);
+
+  useEffect(() => {
+    setPlannerTasks(initialTasks.map(t => ({
+      id: t.id,
+      title: t.title,
+      day_of_week: t.day_of_week,
+      shift: t.shift,
+      member_id: t.member_id,
+      completed: t.completed
+    })));
+  }, [initialTasks]);
 
   const addCustomTask = (e) => {
     e.preventDefault();
